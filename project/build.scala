@@ -7,7 +7,7 @@ object TypeProviderExamples extends Build {
     "rdfs-public",
     file("rdfs-public"),
     settings = macroProjectSettings ++ Seq(
-      libraryDependencies ++= (sesameDependencies :+ "default" %% "thrift_parser" % "0.0.1-SNAPSHOT")
+      libraryDependencies += ("default" %% "thrift_parser" % "0.0.1-SNAPSHOT")
     )
   )
 
@@ -18,7 +18,8 @@ object TypeProviderExamples extends Build {
       /** See this Stack Overflow question and answer for some discussion of
         * why we need this line: http://stackoverflow.com/q/17134244/334519
         */
-      unmanagedClasspath in Compile <++= unmanagedResources in Compile
+      unmanagedClasspath in Compile <++= unmanagedResources in Compile,
+      libraryDependencies += "org.specs2" %% "specs2" % "2.4" % "test"
     )
   ).dependsOn(rdfsPublic)
 }
@@ -48,14 +49,6 @@ object BuildSettings {
       * implemented without the plugin.
       */
     addCompilerPlugin(paradiseDependency)
-  )
-
-  val bananaDependencies = Seq(
-
-  )
-
-  val sesameDependencies = Seq(
-
   )
 
   val macroProjectSettings = buildSettings ++ Seq(
