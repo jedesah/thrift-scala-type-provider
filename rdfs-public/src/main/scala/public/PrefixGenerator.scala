@@ -1,17 +1,33 @@
 package typeproviders.rdfs.public
 
-import org.w3.banana._
-import org.w3.banana.sesame.Sesame
+import com.twitter.scrooge.ast._
+import com.twitter.scrooge.frontend.ThriftParser
+
 import scala.annotation.StaticAnnotation
+import scala.io.Source
 import scala.language.experimental.macros
 import scala.reflect.macros.Context
-import typeproviders.rdfs.SchemaParser
 
 class fromSchema(path: String) extends StaticAnnotation {
-  def macroTransform(annottees: Any*) = macro PrefixGenerator.fromSchema_impl
+  def macroTransform(annottees: Any*): Any = macro PrefixGenerator.fromSchema_impl
 }
 
 object PrefixGenerator {
+
+  def thriftToScalaType(fieldType: FieldType): String = {
+    fieldType match {
+      case TBool => tq"Boolean"
+      case TByte => "Byte"
+      case TI16 => "Short"
+      case TI32 => "Int"
+      case TI64 => "Long"
+      case TDouble => "Double"
+      case TString => "String"
+      case ReferenceType(refName) => refName.fullName
+      case ListType(innerType, _) => "List[" + thriftToScalaType(innerType) + "]"
+    }
+  }
+
   def fromSchema_impl(c: Context)(annottees: c.Expr[Any]*) = {
     import c.universe._
 
@@ -28,13 +44,19 @@ object PrefixGenerator {
       * parse the schema. The following code digs into the tree of the macro
       * application and confirms that we have a string literal.
       */
-    val path = c.macroApplication match {
+    val filename = c.macroApplication match {
       case Apply(Select(Apply(_, List(Literal(Constant(s: String)))), _), _) =>
         s
       case _ => bail(
         "You must provide a literal resource path for schema parsing."
       ) 
     }
+
+    val stream = this.getClass.getResourceAsStream(filename)
+    val contents = Source.fromInputStream(stream).getLines().mkString("\n")
+    val parser = new ThriftParser(true)
+
+    val document = parser.parse(contents, parser.document)
 
     annottees.map(_.tree) match {
       /** Note that we're checking that the body of the annotated object is
@@ -48,23 +70,21 @@ object PrefixGenerator {
         /** The following few steps look exactly like what we did in the case
           * of the anonymous type providers.
           */
-        val schemaParser = SchemaParser.fromResource[Sesame](path).getOrElse(
-          bail(s"Invalid schema: $path.")
-        )
 
-        val baseUri = schemaParser.inferBaseUri.getOrElse(
-          bail("Could not identify a unique schema URI.")
-        )
 
-        val baseUriString = RDFOps[Sesame].fromUri(baseUri)
 
-        val names =
-          schemaParser.classNames(baseUri) ++
-          schemaParser.propertyNames(baseUri)
+        val defs = document.structs.map { struct =>
 
-        val defs = names.map { name =>
-          q"val ${newTermName(name)} = apply($name)"
+          val params = struct.fields.map { field =>
+            val typeName = thriftToScalaType(field.fieldType)
+            q"val ${TermName(field.originalName)}: ${TypeName(typeName)}"
+          }
+          println(params)
+
+          q"case class ${TypeName(struct.originalName)}(..$params)"
         }
+
+        //val defs = List(reify { case class Animal(age: Int, name: String) }.tree)
 
         /** We assume here that the parent is [[org.w3.banana.PrefixBuilder]].
           * We could add some validation logic to confirm this, but the macro
@@ -73,7 +93,7 @@ object PrefixGenerator {
           */
         c.Expr[Any](
           q"""
-            object $name extends $parent(${name.decoded}, $baseUriString) {
+            object $name {
               ..$defs
             }
           """
