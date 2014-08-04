@@ -14,24 +14,24 @@ class fromSchema(path: String) extends StaticAnnotation {
 
 object PrefixGenerator {
 
-  def thriftToScalaType(fieldType: FieldType): String = {
-    fieldType match {
-      case TBool => tq"Boolean"
-      case TByte => "Byte"
-      case TI16 => "Short"
-      case TI32 => "Int"
-      case TI64 => "Long"
-      case TDouble => "Double"
-      case TString => "String"
-      case ReferenceType(refName) => refName.fullName
-      case ListType(innerType, _) => "List[" + thriftToScalaType(innerType) + "]"
-    }
-  }
-
   def fromSchema_impl(c: Context)(annottees: c.Expr[Any]*) = {
     import c.universe._
 
     def bail(message: String) = c.abort(c.enclosingPosition, message)
+
+    def thriftToScalaType(fieldType: FieldType): Tree = {
+      fieldType match {
+        case TBool => tq"Boolean"
+        case TByte => tq"Byte"
+        case TI16 => tq"Short"
+        case TI32 => tq"Int"
+        case TI64 => tq"Long"
+        case TDouble => tq"Double"
+        case TString => tq"String"
+        case ReferenceType(refName) => Ident(TypeName(refName.fullName))
+        case ListType(innerType, _) => tq"List[${thriftToScalaType(innerType)}]"
+      }
+    }
 
     /** The expected usage will look something like this following:
       *
@@ -77,7 +77,7 @@ object PrefixGenerator {
 
           val params = struct.fields.map { field =>
             val typeName = thriftToScalaType(field.fieldType)
-            q"val ${TermName(field.originalName)}: ${TypeName(typeName)}"
+            q"val ${TermName(field.originalName)}: $typeName"
           }
           println(params)
 
@@ -105,4 +105,3 @@ object PrefixGenerator {
     }
   }
 }
-

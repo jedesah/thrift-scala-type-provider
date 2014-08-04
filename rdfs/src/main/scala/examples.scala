@@ -9,7 +9,7 @@ object MyApp extends App {
 
   val a = dct.Point(4)
   val b = dct.Elem(3)
-  val c = dct.Missing(true,"allo", dct.Elem(4))
+  val c = dct.Missing(true,List("allo"), dct.Elem(4))
   println(a)
   println(b)
   println(a.x)
