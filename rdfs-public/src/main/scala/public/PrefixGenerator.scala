@@ -29,8 +29,9 @@ object PrefixGenerator {
         case TDouble => tq"Double"
         case TString => tq"String"
         case ReferenceType(refName) => Ident(TypeName(refName.fullName))
-        case ListType(innerType, _) => tq"List[${thriftToScalaType(innerType)}]"
-        case SetType(innerType, _) => tq"Set[${thriftToScalaType(innerType)}]"
+        case ListType(elemType, _) => tq"List[${thriftToScalaType(elemType)}]"
+        case SetType(elemType, _) => tq"Set[${thriftToScalaType(elemType)}]"
+        case MapType(keyType, valueType, _) => tq"Map[${thriftToScalaType(keyType)}, ${thriftToScalaType(valueType)}]"
       }
     }
 

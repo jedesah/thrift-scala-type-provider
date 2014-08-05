@@ -11,4 +11,5 @@ struct Missing {
     2: list<string> aa
     3: Elem i
     4: set<bool> bb
+    5: map<string, string> cc
 }
