@@ -10,4 +10,5 @@ struct Missing {
     1: bool y
     2: list<string> aa
     3: Elem i
+    4: set<bool> bb
 }

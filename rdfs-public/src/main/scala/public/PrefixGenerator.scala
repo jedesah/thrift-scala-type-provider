@@ -30,6 +30,7 @@ object PrefixGenerator {
         case TString => tq"String"
         case ReferenceType(refName) => Ident(TypeName(refName.fullName))
         case ListType(innerType, _) => tq"List[${thriftToScalaType(innerType)}]"
+        case SetType(innerType, _) => tq"Set[${thriftToScalaType(innerType)}]"
       }
     }
 
