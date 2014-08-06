@@ -19,8 +19,8 @@ object PrefixGenerator {
 
     def bail(message: String) = c.abort(c.enclosingPosition, message)
 
-    def thriftToScalaType(fieldType: FieldType): Tree = {
-      fieldType match {
+    implicit object LiftFieldType extends Liftable[FieldType] {
+      def apply(value: FieldType): Tree = value match {
         case TBool => tq"Boolean"
         case TByte => tq"Byte"
         case TI16 => tq"Short"
@@ -29,10 +29,24 @@ object PrefixGenerator {
         case TDouble => tq"Double"
         case TString => tq"String"
         case ReferenceType(refName) => Ident(TypeName(refName.fullName))
-        case ListType(elemType, _) => tq"List[${thriftToScalaType(elemType)}]"
-        case SetType(elemType, _) => tq"Set[${thriftToScalaType(elemType)}]"
-        case MapType(keyType, valueType, _) => tq"Map[${thriftToScalaType(keyType)}, ${thriftToScalaType(valueType)}]"
+        case ListType(elemType, _) => tq"List[$elemType]"
+        case SetType(elemType, _) => tq"Set[$elemType]"
+        case MapType(keyType, valueType, _) => tq"Map[$keyType, $valueType]"
       }
+    }
+
+    implicit val liftFunType: Liftable[FunctionType] = Liftable[FunctionType] {
+      case TBool => tq"Boolean"
+      case TByte => tq"Byte"
+      case TI16 => tq"Short"
+      case TI32 => tq"Int"
+      case TI64 => tq"Long"
+      case TDouble => tq"Double"
+      case TString => tq"String"
+      case ReferenceType(refName) => Ident(TypeName(refName.fullName))
+      case ListType(elemType, _) => tq"List[$elemType]"
+      case SetType(elemType, _) => tq"Set[$elemType]"
+      case MapType(keyType, valueType, _) => tq"Map[$keyType, $valueType]"
     }
 
     /** The expected usage will look something like this following:
@@ -73,33 +87,48 @@ object PrefixGenerator {
           * of the anonymous type providers.
           */
 
+        val unions = document.defs.collect { case u:Union => u }
 
+        val unionsScala = unions.map { union =>
+            val children = union.fields.map { field =>
+              q"case class ${TypeName(field.originalName)}(x: ${field.fieldType}) extends ${TypeName(union.originalName)}"
+            }
+            val unionType = q"trait ${TypeName(union.originalName)}"
+            val companion = q"object ${TermName(union.originalName)} {..$children}"
+            val topLevel = Seq(unionType, companion)
+            topLevel
+        }
 
-        val defs = document.structs.map { struct =>
+        val structs = document.defs.collect { case s: Struct =>s }
+        val structsAsScalaCaseClass = structs.map { struct =>
 
           val params = struct.fields.map { field =>
-            val typeName = thriftToScalaType(field.fieldType)
-            q"val ${TermName(field.originalName)}: $typeName"
+            q"val ${TermName(field.originalName)}: ${field.fieldType}"
           }
-          println(params)
 
           q"case class ${TypeName(struct.originalName)}(..$params)"
         }
 
-        //val defs = List(reify { case class Animal(age: Int, name: String) }.tree)
+        val servicesAsTrait = document.services.map { service =>
+          val functions = service.functions.map { fun =>
+            val params = fun.args.map { arg =>
+              q"val ${TermName(arg.originalName)}: ${arg.fieldType}"
+            }
+            q"def ${TermName(fun.originalName)}(..$params): ${fun.funcType}"
+          }
+          q"trait ${TypeName(service.sid.name)} { ..$functions }"
+        }
 
-        /** We assume here that the parent is [[org.w3.banana.PrefixBuilder]].
-          * We could add some validation logic to confirm this, but the macro
-          * is likely to fail in a pretty straightforward way if it's not the
-          * case, so we'll leave it like this for the sake of simplicity.
-          */
-        c.Expr[Any](
+        val defs = unionsScala.flatten ++ structsAsScalaCaseClass ++ servicesAsTrait
+        val result = c.Expr[Any](
           q"""
             object $name {
               ..$defs
             }
           """
         )
+        println(showCode(result.tree))
+        result
 
       case _ => bail(
         "You must annotate an object definition with an empty body."

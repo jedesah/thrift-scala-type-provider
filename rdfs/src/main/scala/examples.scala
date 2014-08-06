@@ -13,4 +13,11 @@ object MyApp extends App {
   println(a)
   println(b)
   println(a.x)
+
+  object MyImpl extends dct.Heartbeet {
+    def ping(greet: String, c: dct.Thing): String = "greetings!"
+  }
+
+  val h: dct.Heartbeet = MyImpl
+  h.ping("hello", dct.Thing.a(dct.Point(4)))
 }
