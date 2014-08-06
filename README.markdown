@@ -1,7 +1,7 @@
 Scala Thrift Type Provider
 ============================
 
-Usage:
+###Usage:
 
     @fromSchema("myThrift.thrift") object ChatIDL
    
@@ -12,7 +12,7 @@ Usage:
       def join(userId: ChatIDL.ID)
     }
 
-More elaborate example:
+###More elaborate example
 
 Given this thrift file:
 
