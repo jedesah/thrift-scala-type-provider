@@ -7,17 +7,19 @@ object MyApp extends App {
 
   @fromSchema("/dctype.rdf") object dct
 
-  val a = dct.Point(4)
-  val b = dct.Elem(3)
-  val c = dct.Missing(true,List("allo"), dct.Elem(4), Set(true), Map("hey" -> "you"))
+  import dct._
+
+  val a = Point(4)
+  val b = Elem(3)
+  val c = Missing(true,List("allo"), Elem(4), Set(true), Map("hey" -> "you"))
   println(a)
   println(b)
   println(a.x)
 
-  object MyImpl extends dct.Heartbeet {
-    def ping(greet: String, c: dct.Thing): String = "greetings!"
+  object MyImpl extends Heartbeet {
+    def ping(greet: String, c: Thing): String = "greetings!"
   }
 
-  val h: dct.Heartbeet = MyImpl
-  h.ping("hello", dct.Thing.a(dct.Point(4)))
+  val h: Heartbeet = MyImpl
+  h.ping("hello", Thing.a(Point(4)))
 }
