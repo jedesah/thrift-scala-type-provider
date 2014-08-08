@@ -1,6 +1,5 @@
 package com.github.jedesah.thrift
 
-
 object Example extends App {
 
   @Thrift("/example.thrift") object Thrift
