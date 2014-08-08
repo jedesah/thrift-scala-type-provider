@@ -109,17 +109,27 @@ object PrefixGenerator {
           q"case class ${TypeName(struct.originalName)}(..$params)"
         }
 
-        val servicesAsTrait = document.services.map { service =>
+        val services = document.services.map { service =>
           val functions = service.functions.map { fun =>
             val params = fun.args.map { arg =>
               q"val ${TermName(arg.originalName)}: ${arg.fieldType}"
             }
             q"def ${TermName(fun.originalName)}(..$params): ${fun.funcType}"
           }
-          q"trait ${TypeName(service.sid.name)} { ..$functions }"
+          val name = service.sid.name
+          val interface = q"trait ${TypeName(name)} { ..$functions }"
+          val functionImpl = functions.map { case DefDef(mods, name, typeDefs, params, tpe, _) =>
+            DefDef(NoMods, name, typeDefs, params, tpe, q"???")
+          }
+          val companion = q"""
+              object ${TermName(name)} {
+                case class Client(protocol: org.apache.thrift.protocol.TProtocol) extends ${TypeName(name)} {..$functionImpl}
+              }
+          """
+          List(interface, companion)
         }
 
-        val defs = unionsScala.flatten ++ structsAsScalaCaseClass ++ servicesAsTrait
+        val defs = unionsScala.flatten ++ structsAsScalaCaseClass ++ services.flatten
         val result = c.Expr[Any](
           q"""
             object $name {

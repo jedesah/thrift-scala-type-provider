@@ -7,7 +7,10 @@ object TypeProviderExamples extends Build {
     "rdfs-public",
     file("rdfs-public"),
     settings = macroProjectSettings ++ Seq(
-      libraryDependencies += ("default" %% "thrift_parser" % "0.0.1-SNAPSHOT")
+      libraryDependencies ++= Seq(
+        "default" %% "thrift_parser" % "0.0.1-SNAPSHOT",
+        "org.apache.thrift" % "libthrift" % "0.9.1"
+      )
     )
   )
 
