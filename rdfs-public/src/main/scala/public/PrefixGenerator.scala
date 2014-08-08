@@ -1,4 +1,4 @@
-package typeproviders.rdfs.public
+package com.github.jedesah.thrift
 
 import com.twitter.scrooge.ast._
 import com.twitter.scrooge.frontend.ThriftParser
@@ -8,11 +8,11 @@ import scala.io.Source
 import scala.language.experimental.macros
 import scala.reflect.macros.Context
 
-class fromSchema(path: String) extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro PrefixGenerator.fromSchema_impl
+class Thrift(path: String) extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro Thrift.fromSchema_impl
 }
 
-object PrefixGenerator {
+object Thrift {
 
   def fromSchema_impl(c: Context)(annottees: c.Expr[Any]*) = {
     import c.universe._
@@ -52,7 +52,7 @@ object PrefixGenerator {
     /** The expected usage will look something like this following:
       *
       * {{{
-      * @fromSchema("/dcterms.rdf") object dc extends PrefixBuilder[Rdf] ...
+      * @Thrift("/service_definition.thrift") object calculator
       * }}}
       *
       * The argument to the annotation must be a string literal, since we need
@@ -83,9 +83,6 @@ object PrefixGenerator {
         * to the definition you return.
         */
       case List(q"object $name extends $parent { ..$body }") if body.isEmpty =>
-        /** The following few steps look exactly like what we did in the case
-          * of the anonymous type providers.
-          */
 
         val unions = document.defs.collect { case u:Union => u }
 

@@ -1,13 +1,11 @@
-package typeproviders.rdfs.examples
+package com.github.jedesah.thrift
 
 
-object MyApp extends App {
+object Example extends App {
 
-  import typeproviders.rdfs.public._
+  @Thrift("/example.thrift") object Thrift
 
-  @fromSchema("/dctype.rdf") object dct
-
-  import dct._
+  import Thrift._
 
   val a = Point(4)
   val b = Elem(3)
