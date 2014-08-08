@@ -115,12 +115,24 @@ object Thrift {
           }
           val name = service.sid.name
           val interface = q"trait ${TypeName(name)} { ..$functions }"
-          val functionImpl = functions.map { case DefDef(mods, name, typeDefs, params, tpe, _) =>
-            DefDef(NoMods, name, typeDefs, params, tpe, q"???")
+          val functionImpl = functions.map { case DefDef(mods, name, typeDefs, paramss, tpe, _) =>
+            val nameString = name.toString
+            val params = paramss.flatten
+            val methodNameLiteral = {Literal(Constant(nameString))}
+            val argsName = name + "$args"
+            val argsStruct = q"case class ${TypeName(argsName)}(..${params})"
+            val impl = q"send($methodNameLiteral, ${TermName(argsName)}(..${params.map(_.name)}));receive($methodNameLiteral);"
+            val funWithImpl = DefDef(NoMods, name, typeDefs, paramss, tpe, impl)
+
+            Seq(argsStruct, funWithImpl)
           }
           val companion = q"""
               object ${TermName(name)} {
-                case class Client(protocol: org.apache.thrift.protocol.TProtocol) extends ${TypeName(name)} {..$functionImpl}
+                import org.apache.thrift.protocol.TProtocol
+                import com.github.jedesah.thrift.{Client => BaseClient}
+                case class Client(protocol: TProtocol) extends BaseClient(protocol) with ${TypeName(name)} {
+                  ..${functionImpl.flatten}
+                }
               }
           """
           List(interface, companion)
