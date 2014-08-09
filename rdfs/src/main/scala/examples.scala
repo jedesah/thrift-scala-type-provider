@@ -18,5 +18,5 @@ object Example extends App {
   }
 
   val h: Heartbeet = MyImpl
-  h.ping("hello", Thing.a(Point(4)))
+  h.ping("hello", Thing.a(Point(4)), Day.Monday)
 }

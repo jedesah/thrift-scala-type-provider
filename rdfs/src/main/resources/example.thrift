@@ -26,6 +26,12 @@ union OtherThig {
     3: Missing d
 }
 
+enum Day {
+    Monday,
+    Tuesday,
+    Wednesday
+}
+
 service Heartbeet {
-    string ping(1: string greet, 2: Thing b)
+    string ping(1: string greet, 2: Thing b, 4: Day day)
 }
