@@ -32,6 +32,8 @@ enum Day {
     Wednesday
 }
 
+typedef Day D
+
 service Heartbeet {
-    string ping(1: string greet, 2: Thing b, 4: Day day)
+    string ping(1: string greet, 2: Thing b, 4: D day)
 }

@@ -148,7 +148,12 @@ object Thrift {
           List(enumType, companion)
         }
 
-        val defs = unionsScala.flatten ++ structsAsScalaCaseClass ++ services.flatten ++ enums.flatten
+        val typeDefs = document.defs.collect { case t: Typedef => t }
+        val typeDefsScala = typeDefs.map { typeDef =>
+          q"type ${TypeName(typeDef.sid.name)} = ${typeDef.fieldType}"
+        }
+
+        val defs = unionsScala.flatten ++ structsAsScalaCaseClass ++ services.flatten ++ enums.flatten ++ typeDefsScala
         val result = c.Expr[Any](
           q"""
             object $name {
