@@ -49,6 +49,16 @@ object Thrift {
       case MapType(keyType, valueType, _) => tq"Map[$keyType, $valueType]"
     }
 
+    implicit val liftRHS: Liftable[RHS] = Liftable[RHS] {
+      case BoolLiteral(b) => Literal(Constant(b))
+      case IntLiteral(i) => Literal(Constant(i))
+      case DoubleLiteral(d) => Literal(Constant(d))
+      case StringLiteral(s) => Literal(Constant(s))
+      // TODO This is probably incorrect:
+      case NullLiteral => Literal(Constant(null))
+      case _ => ???
+    }
+
     /** The expected usage will look something like this following:
       *
       * {{{
@@ -100,7 +110,11 @@ object Thrift {
         val structsAsScalaCaseClass = structs.map { struct =>
 
           val params = struct.fields.map { field =>
-            q"val ${TermName(field.originalName)}: ${field.fieldType}"
+            field.default.map { defaultValue =>
+              q"val ${TermName(field.originalName)}: ${field.fieldType} = ${defaultValue}"
+            }.getOrElse {
+              q"val ${TermName(field.originalName)}: ${field.fieldType}"
+            }
           }
 
           q"case class ${TypeName(struct.originalName)}(..$params)"

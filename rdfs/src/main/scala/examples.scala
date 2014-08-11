@@ -8,7 +8,7 @@ object Example extends App {
 
   val a = Point(4)
   val b = Elem(3)
-  val c = Missing(true,List("allo"), Elem(4), Set(true), Map("hey" -> "you"))
+  val c = Missing(aa = List("allo"), i = Elem(4), bb = Set(true), cc = Map("hey" -> "you"))
   println(a)
   println(b)
   println(a.x)

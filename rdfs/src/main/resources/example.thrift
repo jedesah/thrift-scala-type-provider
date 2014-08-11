@@ -7,7 +7,7 @@ struct Elem {
 }
 
 struct Missing {
-    1: bool y
+    1: bool y = true
     2: list<string> aa
     3: Elem i
     4: set<bool> bb
