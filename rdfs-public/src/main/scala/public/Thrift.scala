@@ -49,14 +49,22 @@ object Thrift {
       case MapType(keyType, valueType, _) => tq"Map[$keyType, $valueType]"
     }
 
-    implicit val liftRHS: Liftable[RHS] = Liftable[RHS] {
-      case BoolLiteral(b) => Literal(Constant(b))
-      case IntLiteral(i) => Literal(Constant(i))
-      case DoubleLiteral(d) => Literal(Constant(d))
-      case StringLiteral(s) => Literal(Constant(s))
-      // TODO This is probably incorrect:
-      case NullLiteral => Literal(Constant(null))
-      case _ => ???
+    implicit object LiftRHS extends Liftable[RHS] {
+      def apply(value: RHS): Tree = value match {
+        case BoolLiteral(b) => Literal(Constant(b))
+        case IntLiteral(i) => Literal(Constant(i))
+        case DoubleLiteral(d) => Literal(Constant(d))
+        case StringLiteral(s) => Literal(Constant(s))
+        // TODO This is probably incorrect:
+        case NullLiteral => Literal(Constant(null))
+        case ListRHS(l) => q"Seq(..$l)"
+        case SetRHS(s) => q"Set(..$s)"
+        // TODO This is probably incorrect:
+        case MapRHS(pairs) => q"Map(..$pairs)"
+        case StructRHS(id, fields) => ???
+        case EnumRHS(enum, field) => ???
+        case IdRHS(id) => ???
+      }
     }
 
     /** The expected usage will look something like this following:
