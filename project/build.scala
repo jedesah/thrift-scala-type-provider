@@ -10,6 +10,7 @@ object Thrift extends Build {
       libraryDependencies ++= Seq(
         "default" %% "thrift_parser" % "0.0.1-SNAPSHOT",
         "org.apache.thrift" % "libthrift" % "0.9.1",
+        "com.chuusai" %% "shapeless" % "2.0.0",
         "org.specs2" %% "specs2" % "2.4" % "test"
       )
     )
