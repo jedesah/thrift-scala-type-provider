@@ -14,10 +14,14 @@ class Thrift(path: String) extends StaticAnnotation {
 
 object Thrift {
 
-  def fromSchema_impl(c: Context)(annottees: c.Expr[Any]*) = {
-    import c.universe._
+  def generateScalaASTs(c: scala.reflect.api.Universe, contents: String): Seq[c.Tree] = {
+    val parser = new ThriftParser(true)
+    val document = parser.parse(contents, parser.document)
+    generateScalaASTs(c, document)
+  }
 
-    def bail(message: String) = c.abort(c.enclosingPosition, message)
+  def generateScalaASTs(c: scala.reflect.api.Universe, document: Document): Seq[c.Tree] = {
+    import c._
 
     implicit object LiftFieldType extends Liftable[FieldType] {
       def apply(value: FieldType): Tree = value match {
@@ -67,6 +71,86 @@ object Thrift {
       }
     }
 
+    val unions = document.defs.collect { case u:Union => u }
+
+    val unionsScala = unions.map { union =>
+      val children = union.fields.map { field =>
+        q"case class ${TypeName(field.originalName)}(x: ${field.fieldType}) extends ${TypeName(union.originalName)}"
+      }
+      val unionType = q"trait ${TypeName(union.originalName)}"
+      val companion = q"object ${TermName(union.originalName)} {..$children}"
+      val topLevel = Seq(unionType, companion)
+      topLevel
+    }
+
+    val structs = document.defs.collect { case s: Struct =>s }
+    val structsAsScalaCaseClass = structs.map { struct =>
+
+      val params = struct.fields.map { field =>
+        field.default.map { defaultValue =>
+          q"val ${TermName(field.originalName)}: ${field.fieldType} = ${defaultValue}"
+        }.getOrElse {
+          q"val ${TermName(field.originalName)}: ${field.fieldType}"
+        }
+      }
+
+      q"case class ${TypeName(struct.originalName)}(..$params)"
+    }
+
+    val services = document.services.map { service =>
+      val functions = service.functions.map { fun =>
+        val params = fun.args.map { arg =>
+          q"val ${TermName(arg.originalName)}: ${arg.fieldType}"
+        }
+        q"def ${TermName(fun.originalName)}(..$params): ${fun.funcType}"
+      }
+      val name = service.sid.name
+      val interface = q"trait ${TypeName(name)} { ..$functions }"
+      val functionImpl = functions.map { case DefDef(mods, name, typeDefs, paramss, tpe, _) =>
+        val nameString = name.toString
+        val params = paramss.flatten
+        val methodNameLiteral = {Literal(Constant(nameString))}
+        val argsName = name + "$args"
+        val argsStruct = q"case class ${TypeName(argsName)}(..${params})"
+        val impl = q"send($methodNameLiteral, ${TermName(argsName)}(..${params.map(_.name)}));receive($methodNameLiteral);"
+        val funWithImpl = DefDef(NoMods, name, typeDefs, paramss, tpe, impl)
+
+        Seq(argsStruct, funWithImpl)
+      }
+      val companion = q"""
+              object ${TermName(name)} {
+                import org.apache.thrift.protocol.TProtocol
+                import com.github.jedesah.thrift.{Client => BaseClient}
+                case class Client(protocol: TProtocol) extends BaseClient(protocol) with ${TypeName(name)} {
+                  ..${functionImpl.flatten}
+                }
+              }
+          """
+      List(interface, companion)
+    }
+    val enums = document.enums.map { enum =>
+      val typeName = TypeName(enum.sid.name)
+      val enumType = q"trait $typeName"
+      val values = enum.values.map { value =>
+        q"case object ${TermName(value.sid.name)} extends $typeName"
+      }
+      val companion = q"object ${TermName(enum.sid.name)} { ..$values }"
+      List(enumType, companion)
+    }
+
+    val typeDefs = document.defs.collect { case t: Typedef => t }
+    val typeDefsScala = typeDefs.map { typeDef =>
+      q"type ${TypeName(typeDef.sid.name)} = ${typeDef.fieldType}"
+    }
+
+    unionsScala.flatten ++ structsAsScalaCaseClass ++ services.flatten ++ enums.flatten ++ typeDefsScala
+  }
+
+  def fromSchema_impl(c: Context)(annottees: c.Expr[Any]*) = {
+    import c.universe._
+
+    def bail(message: String) = c.abort(c.enclosingPosition, message)
+
     /** The expected usage will look something like this following:
       *
       * {{{
@@ -86,12 +170,6 @@ object Thrift {
       ) 
     }
 
-    val stream = this.getClass.getResourceAsStream(filename)
-    val contents = Source.fromInputStream(stream).getLines().mkString("\n")
-    val parser = new ThriftParser(true)
-
-    val document = parser.parse(contents, parser.document)
-
     annottees.map(_.tree) match {
       /** Note that we're checking that the body of the annotated object is
         * empty, since in this case it wouldn't make sense for the user to add
@@ -100,82 +178,10 @@ object Thrift {
         * you'd simply remove the check for emptiness below and add the body
         * to the definition you return.
         */
-      case List(q"object $name extends $parent { ..$body }") if body.isEmpty =>
-
-        val unions = document.defs.collect { case u:Union => u }
-
-        val unionsScala = unions.map { union =>
-            val children = union.fields.map { field =>
-              q"case class ${TypeName(field.originalName)}(x: ${field.fieldType}) extends ${TypeName(union.originalName)}"
-            }
-            val unionType = q"trait ${TypeName(union.originalName)}"
-            val companion = q"object ${TermName(union.originalName)} {..$children}"
-            val topLevel = Seq(unionType, companion)
-            topLevel
-        }
-
-        val structs = document.defs.collect { case s: Struct =>s }
-        val structsAsScalaCaseClass = structs.map { struct =>
-
-          val params = struct.fields.map { field =>
-            field.default.map { defaultValue =>
-              q"val ${TermName(field.originalName)}: ${field.fieldType} = ${defaultValue}"
-            }.getOrElse {
-              q"val ${TermName(field.originalName)}: ${field.fieldType}"
-            }
-          }
-
-          q"case class ${TypeName(struct.originalName)}(..$params)"
-        }
-
-        val services = document.services.map { service =>
-          val functions = service.functions.map { fun =>
-            val params = fun.args.map { arg =>
-              q"val ${TermName(arg.originalName)}: ${arg.fieldType}"
-            }
-            q"def ${TermName(fun.originalName)}(..$params): ${fun.funcType}"
-          }
-          val name = service.sid.name
-          val interface = q"trait ${TypeName(name)} { ..$functions }"
-          val functionImpl = functions.map { case DefDef(mods, name, typeDefs, paramss, tpe, _) =>
-            val nameString = name.toString
-            val params = paramss.flatten
-            val methodNameLiteral = {Literal(Constant(nameString))}
-            val argsName = name + "$args"
-            val argsStruct = q"case class ${TypeName(argsName)}(..${params})"
-            val impl = q"send($methodNameLiteral, ${TermName(argsName)}(..${params.map(_.name)}));receive($methodNameLiteral);"
-            val funWithImpl = DefDef(NoMods, name, typeDefs, paramss, tpe, impl)
-
-            Seq(argsStruct, funWithImpl)
-          }
-          val companion = q"""
-              object ${TermName(name)} {
-                import org.apache.thrift.protocol.TProtocol
-                import com.github.jedesah.thrift.{Client => BaseClient}
-                case class Client(protocol: TProtocol) extends BaseClient(protocol) with ${TypeName(name)} {
-                  ..${functionImpl.flatten}
-                }
-              }
-          """
-          List(interface, companion)
-        }
-
-        val enums = document.enums.map { enum =>
-          val typeName = TypeName(enum.sid.name)
-          val enumType = q"trait $typeName"
-          val values = enum.values.map { value =>
-            q"case object ${TermName(value.sid.name)} extends $typeName"
-          }
-          val companion = q"object ${TermName(enum.sid.name)} { ..$values }"
-          List(enumType, companion)
-        }
-
-        val typeDefs = document.defs.collect { case t: Typedef => t }
-        val typeDefsScala = typeDefs.map { typeDef =>
-          q"type ${TypeName(typeDef.sid.name)} = ${typeDef.fieldType}"
-        }
-
-        val defs = unionsScala.flatten ++ structsAsScalaCaseClass ++ services.flatten ++ enums.flatten ++ typeDefsScala
+      case List(q"object $name extends $parent { ..$body }") if body.isEmpty => {
+        val stream = this.getClass.getResourceAsStream(filename)
+        val contents = Source.fromInputStream(stream).getLines().mkString("\n")
+        val defs = generateScalaASTs(c.universe, contents)
         val result = c.Expr[Any](
           q"""
             object $name {
@@ -185,7 +191,7 @@ object Thrift {
         )
         println(showCode(result.tree))
         result
-
+      }
       case _ => bail(
         "You must annotate an object definition with an empty body."
       )

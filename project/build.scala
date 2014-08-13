@@ -9,7 +9,8 @@ object Thrift extends Build {
     settings = macroProjectSettings ++ Seq(
       libraryDependencies ++= Seq(
         "default" %% "thrift_parser" % "0.0.1-SNAPSHOT",
-        "org.apache.thrift" % "libthrift" % "0.9.1"
+        "org.apache.thrift" % "libthrift" % "0.9.1",
+        "org.specs2" %% "specs2" % "2.4" % "test"
       )
     )
   )
