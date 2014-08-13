@@ -14,9 +14,10 @@ class ThriftTypeProviderSpec extends Specification {
           |    1: double x
           |}
         """.stripMargin
-      val actual = Thrift.generateScalaASTs(scala.reflect.runtime.universe, thriftDefinition).head
+      val actual = Thrift.generateScalaASTs(scala.reflect.runtime.universe, thriftDefinition)
       val expected = q"case class Point(x: Double)"
-      if (actual equalsStructure expected) ok else actual ==== expected
+      actual must have length(1)
+      if (actual.head equalsStructure expected) ok else actual.head ==== expected
     }
   }
 }
