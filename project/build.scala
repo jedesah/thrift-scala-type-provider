@@ -1,10 +1,10 @@
 import sbt._, Keys._
 
-object TypeProviderExamples extends Build {
+object Thrift extends Build {
   import BuildSettings._
 
-  lazy val rdfsPublic: Project = Project(
-    "rdfs-public",
+  lazy val macro_ : Project = Project(
+    "macro",
     file("rdfs-public"),
     settings = macroProjectSettings ++ Seq(
       libraryDependencies ++= Seq(
@@ -14,8 +14,8 @@ object TypeProviderExamples extends Build {
     )
   )
 
-  lazy val rdfs: Project = Project(
-    "rdfs",
+  lazy val example: Project = Project(
+    "example",
     file("rdfs"),
     settings = buildSettings ++ Seq(
       /** See this Stack Overflow question and answer for some discussion of
@@ -24,7 +24,7 @@ object TypeProviderExamples extends Build {
       unmanagedClasspath in Compile <++= unmanagedResources in Compile,
       libraryDependencies += "org.specs2" %% "specs2" % "2.4" % "test"
     )
-  ).dependsOn(rdfsPublic)
+  ).dependsOn(macro_)
 }
 
 object BuildSettings {
