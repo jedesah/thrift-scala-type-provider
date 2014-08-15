@@ -121,6 +121,7 @@ object Thrift {
               object ${TermName(name)} {
                 import org.apache.thrift.protocol.TProtocol
                 import com.github.jedesah.thrift.{Client => BaseClient}
+                import com.github.jedesah.thrift.serialization.ThriftCodec.auto._
                 case class Client(protocol: TProtocol) extends BaseClient(protocol) with ${TypeName(name)} {
                   ..${functionImpl.flatten}
                 }
