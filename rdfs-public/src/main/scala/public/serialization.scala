@@ -1,6 +1,6 @@
 package com.github.jedesah.thrift
 
-import org.apache.thrift.protocol.TProtocol
+import org.apache.thrift.protocol.{TList, TProtocol}
 import shapeless._
 
 package object serialization {
@@ -32,6 +32,22 @@ package object serialization {
     implicit val stringCodec = new ThriftCodec[String] {
       def read(protocol: TProtocol): String = protocol.readString()
       def write(obj: String, protocol: TProtocol) { protocol.writeString(obj)}
+    }
+    implicit def listCodec[T: ThriftCodec] = new ThriftCodec[List[T]] {
+      def read(protocol: TProtocol): List[T] = {
+        val listSpec = protocol.readListBegin()
+        // TODO: Make sure the type of the list if correct
+        val result: List[T] = (0 until listSpec.size).map(_ => serialization.read[T](protocol)).toList
+        protocol.readListEnd()
+        result
+      }
+      def write(obj: List[T], protocol: TProtocol): Unit = {
+        // TODO: Add the type of the type of the list for validation
+        val listSpec = new TList(0, obj.size)
+        protocol.writeListBegin(listSpec)
+        obj.foreach(serialization.write(_, protocol))
+        protocol.writeListEnd()
+      }
     }
     implicit def codecInstance: ProductTypeClass[ThriftCodec] = new ProductTypeClass[ThriftCodec] {
       def emptyProduct = new ThriftCodec[HNil] {
