@@ -131,11 +131,12 @@ object Thrift {
     }
     val enums = document.enums.map { enum =>
       val typeName = TypeName(enum.sid.name)
+      val termName = TermName(enum.sid.name)
       val enumType = q"trait $typeName"
       val values = enum.values.map { value =>
         q"case object ${TermName(value.sid.name)} extends $typeName"
       }
-      val companion = q"object ${TermName(enum.sid.name)} { ..$values }"
+      val companion = q"object $termName { ..$values }"
       List(enumType, companion)
     }
 
