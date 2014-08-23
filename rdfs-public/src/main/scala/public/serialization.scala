@@ -1,6 +1,6 @@
 package com.github.jedesah.thrift
 
-import org.apache.thrift.protocol.{TList, TProtocol}
+import org.apache.thrift.protocol.{TStruct, TField, TList, TProtocol}
 import shapeless._
 
 package object serialization {
@@ -49,19 +49,50 @@ package object serialization {
         protocol.writeListEnd()
       }
     }
-    implicit def codecInstance: ProductTypeClass[ThriftCodec] = new ProductTypeClass[ThriftCodec] {
+    implicit def codecInstance: LabelledTypeClass[ThriftCodec] = new LabelledTypeClass[ThriftCodec] {
       def emptyProduct = new ThriftCodec[HNil] {
-        def write(t: HNil, protocol: TProtocol) = {} // No need to write anything to the protocol
+        def write(t: HNil, protocol: TProtocol) {} // No need to write anything to the protocol
         def read(protocol: TProtocol) = HNil // No need to read anything from the protocol
       }
 
-      def product[F, T <: HList](FHead: ThriftCodec[F], FTail: ThriftCodec[T]) = new ThriftCodec[F :: T] {
-        def write(ft: F :: T, protocol: TProtocol) = {
+      def product[F, T <: HList](name: String, FHead: ThriftCodec[F], FTail: ThriftCodec[T]) = new ThriftCodec[F :: T] {
+        def write(ft: F :: T, protocol: TProtocol) {
+          val fieldDescription = new TField(name, null, -1)
+          protocol.writeFieldBegin(fieldDescription)
           FHead.write(ft.head, protocol)
+          protocol.writeFieldEnd()
           FTail.write(ft.tail, protocol)
         }
         def read(protocol: TProtocol): F :: T = {
-          FHead.read(protocol) :: FTail.read(protocol)
+          val fieldDescription = protocol.readFieldBegin()
+          require(fieldDescription.name == name)
+          val head = FHead.read(protocol)
+          protocol.readFieldEnd()
+          head :: FTail.read(protocol)
+        }
+      }
+
+      def emptyCoproduct = new ThriftCodec[CNil] {
+        def write(t: CNil, protocol: TProtocol) {}
+        def read(protocol: TProtocol) = Coproduct[CNil]()
+      }
+
+      def coproduct[L, R <: Coproduct](name: String, CL: => ThriftCodec[L], CR: => ThriftCodec[R]) = new ThriftCodec[L :+: R] {
+        def write(lr: L :+: R, protocol: TProtocol) = lr match {
+          case Inl(l) => {
+            val structDescription = new TStruct(name)
+            protocol.writeStructBegin(structDescription)
+            CL.write(l, protocol)
+            protocol.writeFieldStop()
+            protocol.writeStructEnd()
+          }
+        }
+        def read(protocol: TProtocol): L :+: R = {
+          val structDescription = protocol.readStructBegin()
+          if (structDescription.name != name) throw new org.apache.thrift.transport.TTransportException()
+          val result = CL.read(protocol)
+          protocol.readStructEnd()
+          Inl(result)
         }
       }
 
