@@ -36,7 +36,7 @@ package object serialization {
     implicit def listCodec[T: ThriftCodec] = new ThriftCodec[List[T]] {
       def read(protocol: TProtocol): List[T] = {
         val listSpec = protocol.readListBegin()
-        // TODO: Make sure the type of the list if correct
+        // TODO: Make sure the type of the list is correct
         val result: List[T] = (0 until listSpec.size).map(_ => serialization.read[T](protocol)).toList
         protocol.readListEnd()
         result
