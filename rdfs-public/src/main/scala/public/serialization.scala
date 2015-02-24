@@ -57,7 +57,7 @@ package object serialization {
 
       def product[F, T <: HList](name: String, FHead: ThriftCodec[F], FTail: ThriftCodec[T]) = new ThriftCodec[F :: T] {
         def write(ft: F :: T, protocol: TProtocol) {
-          val fieldDescription = new TField(name, null, -1)
+          val fieldDescription = new TField(name, 0, -1)
           protocol.writeFieldBegin(fieldDescription)
           FHead.write(ft.head, protocol)
           protocol.writeFieldEnd()
@@ -74,7 +74,7 @@ package object serialization {
 
       def emptyCoproduct = new ThriftCodec[CNil] {
         def write(t: CNil, protocol: TProtocol) {}
-        def read(protocol: TProtocol) = Coproduct[CNil]()
+        def read(protocol: TProtocol) {}
       }
 
       def coproduct[L, R <: Coproduct](name: String, CL: => ThriftCodec[L], CR: => ThriftCodec[R]) = new ThriftCodec[L :+: R] {
